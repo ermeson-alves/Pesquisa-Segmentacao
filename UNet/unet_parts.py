@@ -12,13 +12,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# classe que define uma sequência de duas convoluções seguidas de normalização de lote e ativação ReLU
 class double_conv(nn.Module):
     '''(conv => BN => ReLU) * 2'''
     def __init__(self, in_ch, out_ch):
         super(double_conv, self).__init__()
         self.conv = nn.Sequential(
-            nn.Conv2d(in_ch, out_ch, 3, padding=1),
+            nn.Conv2d(in_ch, out_ch, kernel_size=(3,3), padding=1),
             nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
@@ -30,7 +29,7 @@ class double_conv(nn.Module):
         x = self.conv(x)
         return x
 
-# classe que define a camada de entrada da U-Net
+
 class inconv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(inconv, self).__init__()
@@ -40,12 +39,13 @@ class inconv(nn.Module):
         x = self.conv(x)
         return x
 
-# classe que define uma camada de downsampling na U-Net
+
 class down(nn.Module):
+    '''(maxpool 2x2 => doubleconv)'''
     def __init__(self, in_ch, out_ch):
         super(down, self).__init__()
         self.mpconv = nn.Sequential(
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(2,2),
             double_conv(in_ch, out_ch)
         )
 
@@ -74,7 +74,7 @@ class up(nn.Module):
         diffY = x1.size()[3] - x2.size()[3]
         x2 = F.pad(x2, (diffX // 2, int(diffX / 2),
                         diffY // 2, int(diffY / 2)))
-        print(f"------ DEBUG ------:\nx1_shape:{x1.shape}\nx2_shape:{x2.shape}")
+        # print(f"------ DEBUG ------:\nx1_shape:{x1.shape}\nx2_shape:{x2.shape}")
         x = torch.cat([x2, x1], dim=1)
         x = self.conv(x)
         return x

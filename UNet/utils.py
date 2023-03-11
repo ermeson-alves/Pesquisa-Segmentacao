@@ -118,9 +118,3 @@ def get_images(image_dir: Path, preprocess='0', phase='train'):
         mask_paths.append(paths)
     print(f"---- Funcao get_images() de utils.py concluida ----\n")
     return image_paths, mask_paths
-
-a,b = get_images(IMAGES_DIR.parent, preprocess='7')
-import pprint
-pprint.pprint(a)
-print("\n"*2)
-pprint.pprint(b)
