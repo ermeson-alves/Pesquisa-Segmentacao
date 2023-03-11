@@ -9,7 +9,7 @@ Please see our [Presentation at Conference](https://docs.google.com/presentation
 Nesta adaptação, as bibliotecas usadas e suas versões encontram-se em **UNet/requirements.txt** <br><br>
 ~~pytorch 1.0, torchvision 0.2, numpy 1.16, scikit-learn 0.20, cv2 3.4, PIL 5.1 and ipdb 0.12.~~
 ## Steps:
-1. Baixar [DIARETDB dataset](https://www.it.lut.fi/project/imageret/diaretdb1/) e pô-lo em uma pasta `datasets/`
+1. Baixar [DIARETDB dataset](https://www.it.lut.fi/project/imageret/diaretdb1/) e pô-lo em uma pasta `UNet/datasets/`
 2. Abrir o diretório `UNet/` e seguir as orientações.
 
 <br><br>
