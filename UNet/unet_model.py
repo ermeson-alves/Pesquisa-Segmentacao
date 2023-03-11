@@ -7,8 +7,9 @@
 # **************************************
 # full assembly of the sub-parts to form the complete net
 
-from .unet_parts import *
+from unet_parts import *
 
+# Isso segue a arquitetura da UNet
 class UNet(nn.Module):
     def __init__(self, n_channels, n_classes):
         super(UNet, self).__init__()

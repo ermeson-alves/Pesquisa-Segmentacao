@@ -1,17 +1,17 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# **************************************
-# @Author  : Qiqi Xiao
-# @Email     : xiaoqiqi177@gmail.com
-# @File    : preprocess.py
-# **************************************
-#Inspired from: https://github.com/MasazI/clahe_python_opencv/blob/master/core.py
-
-import sys
-import os
-import os.path
 import cv2
 import numpy as np
+from pathlib import Path
+import sys, os 
+
+def clahe():
+    pass
+
+def denoising():
+    pass
+
+def augmentation():
+    pass
+
 
 
 def clahe_gridsize(image_path, mask_path, denoise=False, contrastenhancement=False, brightnessbalance=None, cliplimit=None, gridsize=8):
@@ -40,6 +40,7 @@ def clahe_gridsize(image_path, mask_path, denoise=False, contrastenhancement=Fal
       lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
       lab_planes = cv2.split(lab)
       clahe = cv2.createCLAHE(clipLimit=cliplimit,tileGridSize=(gridsize,gridsize))
+      lab_planes = list(lab_planes)
       lab_planes[0] = clahe.apply(lab_planes[0])
       lab = cv2.merge(lab_planes)
       bgr = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)

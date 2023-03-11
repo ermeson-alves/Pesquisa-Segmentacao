@@ -5,36 +5,27 @@
 # @Email     : xiaoqiqi177@gmail.com & zoujx96@gmail.com
 # @File    : train.py
 # **************************************
-import sys
-from torch.autograd import Variable
-import os
+
+import sys; from pathlib import Path ; import argparse
+# from tqdm import trange
 import numpy as np
 import random
-import copy
-from sklearn.metrics import precision_recall_curve, average_precision_score
-
+import matplotlib.pyplot as plt
+from unet_model import *
+from utils import *
+from dataset import dr_dataset
 import torch
-import torch.backends.cudnn as cudnn
-import torch.nn as nn
 import torch.nn.functional as F
-from torch import optim
+import torch.optim as optim
 from torch.optim import lr_scheduler
-
-import config
-from unet import UNet
-from utils import get_images
-from dataset import IDRIDDataset
 from torchvision import datasets, models, transforms
 from transform.transforms_group import *
 from torch.utils.data import DataLoader, Dataset
-import argparse
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-rotation_angle = config.ROTATION_ANGEL
-image_size = config.IMAGE_SIZE
-image_dir = config.IMAGE_DIR
-batchsize = config.TRAIN_BATCH_SIZE
+from sklearn.metrics import precision_recall_curve, average_precision_score
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+from config import *
 
 def eval_model(model, eval_loader):
     model.eval()
@@ -43,6 +34,9 @@ def eval_model(model, eval_loader):
 
     with torch.set_grad_enabled(False):
         for inputs, true_masks in eval_loader:
+            # inputs: imagens de avaliação
+            # true_masks: mascaras dessas imagens
+
             inputs = inputs.to(device=device, dtype=torch.float)
             true_masks = true_masks.to(device=device, dtype=torch.float)
             bs, _, h, w = inputs.shape
@@ -55,7 +49,7 @@ def eval_model(model, eval_loader):
                 for j in range(w_size):
                     h_max = min(h, (i + 1) * image_size)
                     w_max = min(w, (j + 1) * image_size)
-                    inputs_part = inputs[:,:, i*image_size:h_max, j*image_size:w_max]
+                    inputs_part = inputs[:, :, i*image_size:h_max, j*image_size:w_max]
                     masks_pred_single = model(inputs_part)
                     masks_pred[:, :, i*image_size:h_max, j*image_size:w_max] = masks_pred_single
 
@@ -107,25 +101,29 @@ def train_model(model, lesion, preprocess, train_loader, eval_loader, criterion,
     tot_step_count = start_step
 
     best_ap = 0.
-    dir_checkpoint = 'results/models_' + lesion.lower()
+    dir_checkpoint = Path('results/models_'+lesion.lower())
 
-    for epoch in range(start_epoch, start_epoch + num_epochs):
-        print('Starting epoch {}/{}.\t\n'.format(epoch + 1, start_epoch+num_epochs))
-        g_scheduler.step()
+    for epoch in range(start_epoch, num_epochs): #ADAPTAR PARA TRANGE
+        """Aqui foi feita a seguinte modificação:
+           for epoch in range(start_epoch, start_epoch + num_epochs) >>>> for epoch in range(start_epoch, num_epochs) """
+        print('Starting epoch {}/{}.\t\n'.format(epoch + 1, num_epochs))
+        g_scheduler.step() # TIRAR DUVIDA COM DEBORA E PEDRO:
+        """PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure 
+            to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate"""
         model.train()
 
         for inputs, true_masks in train_loader:
             inputs = inputs.to(device=device, dtype=torch.float)
             true_masks = true_masks.to(device=device, dtype=torch.float)
+            print(f"INPUTS_shape: {inputs.shape} type: {type(inputs)}\nTRUE_MASK_shape: {true_masks.shape}type: {type(true_masks)} \n")
             masks_pred = model(inputs)
-            masks_pred_transpose = masks_pred.permute(0, 2, 3, 1)
+            print(f"MASKS PRED_shape: {masks_pred.shape} type: {type(masks_pred)}\n\n")
+            masks_pred_transpose = masks_pred.permute(0, 2, 3, 1) # BS, C, H,W >>> BS, H, W, C
             masks_pred_flat = masks_pred_transpose.reshape(-1, masks_pred_transpose.shape[-1])
             true_masks_indices = torch.argmax(true_masks, 1)
             true_masks_flat = true_masks_indices.reshape(-1)
             loss_ce = criterion(masks_pred_flat, true_masks_flat.long())
             
-            # Save images
-
             ce_weight = 1.
             g_loss = loss_ce * ce_weight
 
@@ -135,10 +133,11 @@ def train_model(model, lesion, preprocess, train_loader, eval_loader, criterion,
             
             tot_step_count += 1
         
-        if not os.path.exists(dir_checkpoint):
-            os.mkdir(dir_checkpoint)
+        if not dir_checkpoint.exists():
+           dir_checkpoint.parent.mkdir()
+           dir_checkpoint.mkdir()
 
-        if (epoch + 1) % 40 == 0:
+        if (epoch + 1) % 1 == 0:
             eval_ap = eval_model(model, eval_loader)
             with open("ap_during_learning_" + lesion + preprocess + ".txt", 'a') as f:
                 f.write("epoch: " + str(epoch))
@@ -152,11 +151,11 @@ def train_model(model, lesion, preprocess, train_loader, eval_loader, criterion,
                     'epoch': epoch,
                     'step': tot_step_count,
                     'state_dict': model.state_dict(),
-                    'optimizer': g_optimizer.state_dict()
+                    'optimizer': g_optimizer.state_dict(),
+                    'loss': g_loss,
                     }
 
-                torch.save(state, \
-                            os.path.join(dir_checkpoint, 'model_' + preprocess + '.pth.tar'))
+                torch.save(state, Path(dir_checkpoint, 'model_' + preprocess + '.pt'))
         
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -175,18 +174,19 @@ if __name__ == '__main__':
     
     model = UNet(n_channels=3, n_classes=2)
     g_optimizer = optim.SGD(model.parameters(),
-                              lr=config.G_LEARNING_RATE,
+                              lr=LEARNING_RATE,
                               momentum=0.9,
                               weight_decay=0.0005)
     resume = False
     if resume:
-        if os.path.isfile(resume):
+        if resume.is_file():
             print("=> loading checkpoint '{}'".format(resume))
             checkpoint = torch.load(resume)
             start_epoch = checkpoint['epoch']+1
             start_step = checkpoint['step']
             model.load_state_dict(checkpoint['state_dict'])
             g_optimizer.load_state_dict(checkpoint['optimizer'])
+            loss = checkpoint['loss']
             print('Model loaded from {}'.format(resume))
         else:
             print("=> no checkpoint found at '{}'".format(resume))
@@ -194,21 +194,21 @@ if __name__ == '__main__':
         start_epoch = 0
         start_step = 0
 
-    train_image_paths, train_mask_paths = get_images(image_dir, args.preprocess, phase='train')
-    eval_image_paths, eval_mask_paths = get_images(image_dir, args.preprocess, phase='eval')
+    train_image_paths, train_mask_paths = get_images(IMAGES_DIR.parent, args.preprocess, phase='train')
+    eval_image_paths, eval_mask_paths = get_images(IMAGES_DIR.parent, args.preprocess, phase='eval')
 
-    train_dataset = IDRIDDataset(train_image_paths, train_mask_paths, config.LESION_IDS[args.lesion], transform=
+    train_dataset = dr_dataset(ANNOTATIONS_TRAINING_PATH, IMAGES_DIR, MASKS_DIR, LESION_IDS[args.lesion], transform=
                             Compose([
-                            RandomRotation(rotation_angle),
+                            RandomRotation(ROTATION_ANGEL),
                             RandomCrop(image_size),
                 ]))
-    eval_dataset = IDRIDDataset(eval_image_paths, eval_mask_paths, config.LESION_IDS[args.lesion])
+    eval_dataset = dr_dataset(ANNOTATIONS_VALID_PATH, IMAGES_DIR, MASKS_DIR, LESION_IDS[args.lesion])
 
-    train_loader = DataLoader(train_dataset, batchsize, shuffle=True)
-    eval_loader = DataLoader(eval_dataset, batchsize, shuffle=False)
+    train_loader = DataLoader(train_dataset, BATCH_SIZE, shuffle=True)
+    eval_loader = DataLoader(eval_dataset, BATCH_SIZE, shuffle=False)
 
     g_scheduler = lr_scheduler.StepLR(g_optimizer, step_size=200, gamma=0.9)
-    criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(config.CROSSENTROPY_WEIGHTS).to(device))
+    criterion = nn.CrossEntropyLoss(weight=torch.FloatTensor(CROSSENTROPY_WEIGHTS).to(device))
     
     train_model(model, args.lesion, args.preprocess, train_loader, eval_loader, criterion, g_optimizer, g_scheduler, \
-        batchsize, num_epochs=config.EPOCHES, start_epoch=start_epoch, start_step=start_step)
+        BATCH_SIZE, num_epochs=EPOCHES, start_epoch=start_epoch, start_step=start_step)

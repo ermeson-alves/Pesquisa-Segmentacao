@@ -9,7 +9,7 @@ from __future__ import division
 import torch
 import math
 import random
-from PIL import Image, ImageOps, ImageEnhance, PILLOW_VERSION
+from PIL import Image, ImageOps, ImageEnhance, __version__
 try:
     import accimage
 except ImportError:
