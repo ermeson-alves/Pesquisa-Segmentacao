@@ -3,30 +3,34 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 from torch.utils.data import DataLoader
-import torchvision.transforms.functional as TF
-from torchvision import datasets, models, transforms
+# import torchvision.transforms.functional as TF
+# from torchvision import datasets, models, transforms
 from transform.transforms_group import *
+from utils import *
 import torch
 from config import *
 
-RESOURCES_PATH = Path("datasets/diaretdb1_v_1_1/resources")
 batch_size = BATCH_SIZE
 img_dir = IMAGES_DIR
 mask_dir = MASKS_DIR
 
-train_data = dataset.dr_dataset(Path(RESOURCES_PATH/"traindatasets/trainset.txt"),
-                                img_dir,
-                                mask_dir,
-                                0,  Compose([RandomRotation(ROTATION_ANGEL),RandomCrop(image_size),]))
-test_data = dataset.dr_dataset( Path(RESOURCES_PATH/"testdatasets/testset.txt"),
-                                img_dir,
-                                mask_dir,
-                                0, None
-                               )
+train_img_paths, train_masks_paths = get_images(IMAGES_DIR, '7', phase='train')
+test_img_paths, test_masks_paths = get_images(IMAGES_DIR, '7', phase='eval')
 
+
+
+train_data = dataset.IDRIDDataset(train_img_paths,
+                                train_masks_paths,
+                                0,  
+                                Compose([RandomRotation(ROTATION_ANGEL),RandomCrop(image_size),]))
+test_data = dataset.IDRIDDataset(test_img_paths,
+                                test_masks_paths,
+                                0, None
+                                )
 
 train_dataloader = DataLoader(train_data, batch_size, shuffle=True)
 test_dataloader = DataLoader(test_data, batch_size, shuffle=True)
+
 
 
 # """Busca 4 imagens de forma aleatória do conjunto de dados e as exibe um uma figure"""
@@ -44,10 +48,12 @@ for lin in range(4):
 plt.show()
 
 
-
 # teste para treino:
-print("UM LOTE OBTIDO. SHAPES:")
-inputs, true_masks = next(iter(test_dataloader))
-print(f"inputs_shape: {inputs.shape}\ntrue_masks_shape: {true_masks.shape}")
+# print("UM LOTE OBTIDO. SHAPES:")
+# inputs, true_masks = next(iter(test_dataloader))
+# print(f"inputs_shape: {inputs.shape}\ntrue_masks_shape: {true_masks.shape}")
+# func = lambda img: img.size
+# sizes = list(map(func, train_data.images))
+# print(set(sizes))
 
                    

@@ -11,16 +11,16 @@ import sys; from pathlib import Path ; import argparse
 import numpy as np
 import random
 import matplotlib.pyplot as plt
-from unet_model import *
+from unet import UNet
 from utils import *
-from dataset import dr_dataset
+from dataset import DIARETDBDataset, IDRIDDataset
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from torchvision import datasets, models, transforms
 from transform.transforms_group import *
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
 
 from sklearn.metrics import precision_recall_curve, average_precision_score
@@ -43,6 +43,7 @@ def eval_model(model, eval_loader):
             # not ignore the last few patches
             h_size = (h - 1) // image_size + 1
             w_size = (w - 1) // image_size + 1
+            print(f"In eval_model() | h_size: {h_size} w_size: {w_size}")
             masks_pred = torch.zeros(true_masks.shape).to(dtype=torch.float)
 
             for i in range(h_size):
@@ -115,10 +116,11 @@ def train_model(model, lesion, preprocess, train_loader, eval_loader, criterion,
         for inputs, true_masks in train_loader:
             inputs = inputs.to(device=device, dtype=torch.float)
             true_masks = true_masks.to(device=device, dtype=torch.float)
-            print(f"INPUTS_shape: {inputs.shape} type: {type(inputs)}\nTRUE_MASK_shape: {true_masks.shape}type: {type(true_masks)} \n")
+            print(f"INPUTS_shape: {inputs.shape} type: {type(inputs)}\nTRUE_MASK_shape: {true_masks.shape}type: {type(true_masks)}\n")
             masks_pred = model(inputs)
-            print(f"MASKS PRED_shape: {masks_pred.shape} type: {type(masks_pred)}\n\n")
+            print(f"MASKS_PRED_shape: {masks_pred.shape} type: {type(masks_pred)}\n")
             masks_pred_transpose = masks_pred.permute(0, 2, 3, 1) # BS, C, H,W >>> BS, H, W, C
+            # print("masks_pred_transpose: {}")
             masks_pred_flat = masks_pred_transpose.reshape(-1, masks_pred_transpose.shape[-1])
             true_masks_indices = torch.argmax(true_masks, 1)
             true_masks_flat = true_masks_indices.reshape(-1)
@@ -130,7 +132,7 @@ def train_model(model, lesion, preprocess, train_loader, eval_loader, criterion,
             g_optimizer.zero_grad()
             g_loss.backward()
             g_optimizer.step()
-            
+            print("Step_count |train_model(): ", tot_step_count)
             tot_step_count += 1
         
         if not dir_checkpoint.exists():
@@ -194,15 +196,14 @@ if __name__ == '__main__':
         start_epoch = 0
         start_step = 0
 
-    train_image_paths, train_mask_paths = get_images(IMAGES_DIR.parent, args.preprocess, phase='train')
-    eval_image_paths, eval_mask_paths = get_images(IMAGES_DIR.parent, args.preprocess, phase='eval')
+    train_image_paths, train_mask_paths = get_images(IMAGES_DIR, args.preprocess, phase='train')
+    eval_image_paths, eval_mask_paths = get_images(IMAGES_DIR, args.preprocess, phase='eval')
 
-    train_dataset = dr_dataset(ANNOTATIONS_TRAINING_PATH, IMAGES_DIR, MASKS_DIR, LESION_IDS[args.lesion], transform=
-                            Compose([
-                            RandomRotation(ROTATION_ANGEL),
-                            RandomCrop(image_size),
-                ]))
-    eval_dataset = dr_dataset(ANNOTATIONS_VALID_PATH, IMAGES_DIR, MASKS_DIR, LESION_IDS[args.lesion])
+    train_dataset = IDRIDDataset(train_image_paths, train_mask_paths, LESION_IDS[args.lesion], transform=
+                                Compose([
+                                RandomRotation(ROTATION_ANGEL),
+                                RandomCrop(image_size),]))
+    eval_dataset = IDRIDDataset(eval_image_paths, eval_mask_paths, LESION_IDS[args.lesion])
 
     train_loader = DataLoader(train_dataset, BATCH_SIZE, shuffle=True)
     eval_loader = DataLoader(eval_dataset, BATCH_SIZE, shuffle=False)
