@@ -109,6 +109,7 @@ def get_images(image_dir: Path, preprocess='0', phase='train'):
             else:
                 paths.append(None)
         mask_paths.append(paths)
+    print("-- Fim get_images() --")
     return image_paths, mask_paths
 
 
